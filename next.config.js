@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 禁用 webpack HMR (Hot Module Replacement)
+  // 禁用 webpack HMR (Hot Module Replacement)123
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer) {
       config.watchOptions = {
