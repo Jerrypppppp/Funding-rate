@@ -7,6 +7,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: '100%',
@@ -47,7 +48,7 @@ export default function Home() {
         </Typography>
 
         <Grid container spacing={4}>
-          <Grid item xs={12} sm={6} md={6}>
+          <Grid item xs={12} sm={6} md={4}>
             <Link href="/funding-rate" passHref style={{ textDecoration: 'none' }}>
               <StyledCard>
                 <CardContent>
@@ -65,7 +66,25 @@ export default function Home() {
             </Link>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={6}>
+          <Grid item xs={12} sm={6} md={4}>
+            <Link href="/fund-flow" passHref style={{ textDecoration: 'none' }}>
+              <StyledCard>
+                <CardContent>
+                  <IconWrapper>
+                    <MonetizationOnIcon />
+                  </IconWrapper>
+                  <Typography variant="h5" component="h2" gutterBottom>
+                    資金流向 →
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary">
+                    查看各大交易所的資金流入流出情況
+                  </Typography>
+                </CardContent>
+              </StyledCard>
+            </Link>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={4}>
             <Link href="/volume" passHref style={{ textDecoration: 'none' }}>
               <StyledCard>
                 <CardContent>
