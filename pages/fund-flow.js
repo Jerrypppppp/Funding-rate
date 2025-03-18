@@ -3,80 +3,56 @@ import Head from 'next/head';
 import {
   Container,
   Typography,
-  Card,
-  CardContent,
-  Grid,
   Box,
-  CircularProgress,
-  Chip,
-  Tooltip,
-  IconButton,
   Paper,
-  Divider
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TableSortLabel,
+  CircularProgress,
+  Grid
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
-import InfoIcon from '@mui/icons-material/Info';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
 
-const StyledCard = styled(Card)(({ theme }) => ({
-  height: '100%',
-  display: 'flex',
-  flexDirection: 'column',
-  transition: 'transform 0.3s ease-in-out',
-}));
-
-const FlowIndicator = styled(Box)(({ theme, ispositive }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  color: ispositive === 'true' ? theme.palette.success.main : theme.palette.error.main,
-  '& svg': {
-    marginRight: theme.spacing(1),
-  },
-}));
-
-const InfoCard = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(2),
-  marginBottom: theme.spacing(4),
-  backgroundColor: theme.palette.grey[50],
-  '& .MuiTypography-root': {
-    marginBottom: theme.spacing(1),
-  },
-}));
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 export default function FundFlow() {
-  const [flowData, setFlowData] = useState(null);
+  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const formatFlow = (flow) => {
-    if (flow === null || flow === undefined || isNaN(flow)) {
-      return '0.00';
-    }
-    
-    const absFlow = Math.abs(flow);
-    if (absFlow >= 1e9) {
-      return `${(flow / 1e9).toFixed(2)}B`;
-    } else if (absFlow >= 1e6) {
-      return `${(flow / 1e6).toFixed(2)}M`;
-    } else if (absFlow >= 1e3) {
-      return `${(flow / 1e3).toFixed(2)}K`;
-    }
-    return flow.toFixed(2);
-  };
+  const [orderBy, setOrderBy] = useState('netFlow');
+  const [order, setOrder] = useState('desc');
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await fetch('/api/fund-flow');
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
+        const result = await response.json();
+        if (result.success) {
+          setData(result.data);
         }
-        const data = await response.json();
-        setFlowData(data);
-      } catch (err) {
-        setError(err.message);
+      } catch (error) {
+        console.error('Error fetching fund flow data:', error);
       } finally {
         setLoading(false);
       }
@@ -87,134 +63,165 @@ export default function FundFlow() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const handleSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
 
-  if (error) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <Typography color="error">Error: {error}</Typography>
-      </Box>
-    );
-  }
+  const sortedData = [...data].sort((a, b) => {
+    const valueA = parseFloat(a[orderBy]);
+    const valueB = parseFloat(b[orderBy]);
+    return (order === 'asc' ? 1 : -1) * (valueA - valueB);
+  });
+
+  // 為圖表準備數據
+  const chartData = {
+    labels: data.map(item => item.exchange),
+    datasets: [
+      {
+        label: '淨流入 (USD)',
+        data: data.map(item => parseFloat(item.netFlow)),
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: data.map(item => 
+          parseFloat(item.netFlow) >= 0 ? 'rgba(76, 175, 80, 0.5)' : 'rgba(244, 67, 54, 0.5)'
+        ),
+        tension: 0.1
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: '交易所資金流向'
+      }
+    },
+    scales: {
+      y: {
+        ticks: {
+          callback: value => `$${(value / 1e6).toFixed(2)}M`
+        }
+      }
+    }
+  };
 
   return (
-    <>
+    <Container>
       <Head>
-        <title>交易所資金流向 - 加密貨幣數據中心</title>
-        <meta name="description" content="即時查看各大交易所的資金流向數據" />
+        <title>資金流向 - 加密貨幣數據中心</title>
+        <meta name="description" content="查看各大交易所的資金流入流出情況" />
       </Head>
 
-      <Container maxWidth="lg" sx={{ py: 8 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          align="center"
-          gutterBottom
-          sx={{ mb: 4, fontWeight: 'bold' }}
-        >
-          交易所資金流向
-        </Typography>
+      <Typography variant="h4" component="h1" gutterBottom>
+        資金流向
+      </Typography>
 
-        <InfoCard elevation={0}>
-          <Box display="flex" alignItems="center" mb={1}>
-            <InfoIcon color="primary" sx={{ mr: 1 }} />
-            <Typography variant="h6">數據說明</Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            • 資金流向數據基於最近1000筆交易計算，反映當前市場趨勢
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            • 大額交易定義為單筆交易金額超過10萬USDT
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            • 數據每分鐘自動更新，確保及時性
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            • 目前支援 BTC/USDT 交易對的資金流向監控
-          </Typography>
-        </InfoCard>
-
-        <Grid container spacing={4}>
-          <Grid item xs={12}>
-            <StyledCard>
-              <CardContent>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h5" gutterBottom>
-                    總體資金流向
-                  </Typography>
-                  <Tooltip title="顯示所有交易所的淨流入/流出總和">
-                    <IconButton size="small">
-                      <HelpOutlineIcon />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-                <FlowIndicator ispositive={((flowData?.total?.netFlow || 0) > 0).toString()}>
-                  {(flowData?.total?.netFlow || 0) > 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
-                  <Typography variant="h4">
-                    {formatFlow(flowData?.total?.netFlow)} USDT
-                  </Typography>
-                </FlowIndicator>
-                <Box mt={2}>
-                  <Typography variant="body2" color="text.secondary">
-                    24小時成交量：{formatFlow(flowData?.total?.volume24h)} USDT
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    大額交易次數：{flowData?.total?.largeOrdersCount || 0} 次
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                    最後更新：{new Date(flowData?.total?.timestamp || Date.now()).toLocaleString()}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </StyledCard>
-          </Grid>
-
-          {Object.entries(flowData || {})
-            .filter(([key]) => key !== 'total')
-            .map(([exchange, data]) => (
-              <Grid item xs={12} md={4} key={exchange}>
-                <StyledCard>
-                  <CardContent>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                      <Typography variant="h6" textTransform="capitalize">
-                        {exchange}
-                      </Typography>
-                      <Chip
-                        label={(data?.netFlow || 0) > 0 ? '淨流入' : '淨流出'}
-                        color={(data?.netFlow || 0) > 0 ? 'success' : 'error'}
-                        size="small"
-                      />
-                    </Box>
-                    <FlowIndicator ispositive={((data?.netFlow || 0) > 0).toString()}>
-                      {(data?.netFlow || 0) > 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
-                      <Typography variant="h6">
-                        {formatFlow(data?.netFlow)} USDT
-                      </Typography>
-                    </FlowIndicator>
-                    <Divider sx={{ my: 2 }} />
-                    <Box>
-                      <Typography variant="body2" color="text.secondary">
-                        24小時成交量：{formatFlow(data?.volume24h)} USDT
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        大額交易次數：{data?.largeOrdersCount || 0} 次
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" display="block" mt={1}>
-                        最後更新：{new Date(data?.timestamp || Date.now()).toLocaleString()}
-                      </Typography>
-                    </Box>
-                  </CardContent>
-                </StyledCard>
-              </Grid>
-            ))}
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Paper sx={{ p: 2 }}>
+            <Box className="chart-container">
+              <Line data={chartData} options={chartOptions} />
+            </Box>
+          </Paper>
         </Grid>
-      </Container>
-    </>
+
+        <Grid item xs={12}>
+          {loading ? (
+            <Box display="flex" justifyContent="center" my={4}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>交易所</TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={orderBy === 'inflow'}
+                        direction={orderBy === 'inflow' ? order : 'asc'}
+                        onClick={() => handleSort('inflow')}
+                      >
+                        流入
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={orderBy === 'outflow'}
+                        direction={orderBy === 'outflow' ? order : 'asc'}
+                        onClick={() => handleSort('outflow')}
+                      >
+                        流出
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={orderBy === 'netFlow'}
+                        direction={orderBy === 'netFlow' ? order : 'asc'}
+                        onClick={() => handleSort('netFlow')}
+                      >
+                        淨流入
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={orderBy === 'change24h'}
+                        direction={orderBy === 'change24h' ? order : 'asc'}
+                        onClick={() => handleSort('change24h')}
+                      >
+                        24小時變化
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={orderBy === 'marketShare'}
+                        direction={orderBy === 'marketShare' ? order : 'asc'}
+                        onClick={() => handleSort('marketShare')}
+                      >
+                        市場份額
+                      </TableSortLabel>
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedData.map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{row.exchange}</TableCell>
+                      <TableCell align="right">
+                        ${(parseFloat(row.inflow) / 1e6).toFixed(2)}M
+                      </TableCell>
+                      <TableCell align="right">
+                        ${(parseFloat(row.outflow) / 1e6).toFixed(2)}M
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        className={parseFloat(row.netFlow) >= 0 ? 'positive' : 'negative'}
+                      >
+                        ${(parseFloat(row.netFlow) / 1e6).toFixed(2)}M
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        className={parseFloat(row.change24h) >= 0 ? 'positive' : 'negative'}
+                      >
+                        {row.change24h}%
+                      </TableCell>
+                      <TableCell align="right">
+                        {row.marketShare}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Grid>
+      </Grid>
+    </Container>
   );
 } 

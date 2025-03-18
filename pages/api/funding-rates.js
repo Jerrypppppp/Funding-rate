@@ -14,40 +14,56 @@ if (!global.io) {
 }
 io = global.io;
 
-// 主要的 API 處理函數
-export default async function handler(req, res) {
-  // 設置 CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// 模擬資金費率數據
+const exchanges = ['Binance', 'Bybit', 'OKX', 'Bitget', 'HyperLiquid'];
+const symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'XRP/USDT'];
 
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+function generateFundingRate() {
+  return (Math.random() * 0.002 - 0.001).toFixed(6); // 生成 -0.1% 到 0.1% 之間的隨機數
+}
+
+function generateNextFundingTime() {
+  const now = new Date();
+  const hours = now.getUTCHours();
+  let nextHour;
+  
+  // Binance 的資金費率時間是每 8 小時（UTC 00:00, 08:00, 16:00）
+  if (hours < 8) nextHour = 8;
+  else if (hours < 16) nextHour = 16;
+  else nextHour = 24;
+  
+  const next = new Date(now);
+  next.setUTCHours(nextHour, 0, 0, 0);
+  return next.toISOString();
+}
+
+export default function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: '只允許 GET 請求' });
   }
 
   try {
-    const currentTime = Date.now();
-    
-    // 檢查緩存是否有效
-    if (cachedData && currentTime - lastCacheTime < CACHE_DURATION) {
-      return res.status(200).json(cachedData);
-    }
+    const data = exchanges.map(exchange => {
+      return symbols.map(symbol => ({
+        exchange,
+        symbol,
+        fundingRate: generateFundingRate(),
+        nextFundingTime: generateNextFundingTime(),
+        volume24h: Math.floor(Math.random() * 1000000000), // 隨機24小時交易量
+        openInterest: Math.floor(Math.random() * 500000000) // 隨機未平倉合約量
+      }));
+    }).flat();
 
-    // 獲取新數據
-    const data = await fetchAllExchangeData();
-    
-    // 更新緩存
-    cachedData = data;
-    lastCacheTime = currentTime;
-
-    res.status(200).json(data);
+    res.status(200).json({
+      success: true,
+      data,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error fetching funding rates:', error);
-    res.status(500).json({ 
+    console.error('Error generating funding rates:', error);
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch funding rates',
-      details: error.message 
+      message: '生成資金費率數據時發生錯誤'
     });
   }
 }
